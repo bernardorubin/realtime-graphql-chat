@@ -2,6 +2,7 @@ import React, { Component } from 'react'
 
 // Import GraphQL helpers
 import { graphql, compose } from 'react-apollo'
+import gql from 'graphql-tag'
 import ALL_CHATS_QUERY from './AllChatsQuery'
 import CREATE_CHAT_MUTATION from './NewChatMutation'
 import Chatbox from './components/Chatbox'
@@ -19,6 +20,9 @@ class App extends Component {
     // when page loads
     const from = window.prompt('username')
     from && this.setState({ from })
+
+    //Subscribe to socket
+    this._subscribeToNewChats()
   }
   _createChat = async e => {
     if (e.key === 'Enter') {
@@ -28,6 +32,33 @@ class App extends Component {
       })
       this.setState({ content: '' })
     }
+  }
+  _subscribeToNewChats = () => {
+    this.props.allChatsQuery.subscribeToMore({
+      document: gql`
+        subscription {
+          Chat(filter: { mutation_in: [CREATED] }) {
+            node {
+              id
+              from
+              content
+              createdAt
+            }
+          }
+        }
+      `,
+      updateQuery: (previous, { subscriptionData }) => {
+        const newChatLinks = [
+          ...previous.allChats,
+          subscriptionData.data.Chat.node
+        ]
+        const result = {
+          ...previous,
+          allChats: newChatLinks
+        }
+        return result
+      }
+    })
   }
   render() {
     const allChats = this.props.allChatsQuery.allChats || []
